@@ -5,7 +5,11 @@ import(
 	"bufio" 
 	"fmt"
 	"os" 
-	//"errors"
+	"net/http" 
+	"errors"
+	"strconv"
+	"io"
+	"encoding/json"
 ) 
 
 func main() { 
@@ -22,6 +26,11 @@ func main() {
 			description:	"Exit the Pokedex",
 			callback:		commandExit, 
 		},  
+		"map": {
+			name:			"map", 
+			description:	"Displays all locations", 
+			callback: 		commandMap,
+		},
 	}
 	for {
 		if scanner.Scan() == true { 
@@ -53,6 +62,32 @@ func commandHelp() error {
 		fmt.Println(command.name + ": " + command.description)
 	} 
 	return nil 
+} 
+
+func commandMap() error {
+	finalIndex += 20 
+	for mapIndex <= finalIndex {
+	res, err := http.Get("https://pokeapi.co/api/v2/location-area/" + strconv.FormatUint(uint64(mapIndex), 10)) 
+	if err != nil {
+		errors.New("Get request failed")
+	}
+
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		errors.New("io.ReadAll() failed")
+	}
+
+	location := location{} 
+	err = json.Unmarshal(body, &location)
+	if err != nil {
+		errors.New("json.Unmarshal() failed")
+	}
+	fmt.Println(location.Name) 
+
+	defer res.Body.Close()
+	mapIndex++
+	}
+	return nil
 }
 
 type cliCommand struct {
@@ -61,4 +96,12 @@ type cliCommand struct {
 	callback 	func() error 
 } 
 
+type location struct {
+	Name	string	`json:"name"`
+}
+
 var commands map[string]cliCommand
+
+var mapIndex uint16 = 1 
+
+var finalIndex uint16 = 1
