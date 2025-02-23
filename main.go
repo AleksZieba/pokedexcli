@@ -28,8 +28,13 @@ func main() {
 		},  
 		"map": {
 			name:			"map", 
-			description:	"Displays all locations", 
+			description:	"Displays next 20 locations", 
 			callback: 		commandMap,
+		}, 
+		"mapb": {
+			name: 			"mapb",
+			description:	"Displays previous 20 locations",
+			callback:		commandMapB,
 		},
 	}
 	for {
@@ -66,26 +71,57 @@ func commandHelp() error {
 
 func commandMap() error {
 	finalIndex += 20 
+	mapIndex := finalIndex - 20
 	for mapIndex <= finalIndex {
-	res, err := http.Get("https://pokeapi.co/api/v2/location-area/" + strconv.FormatUint(uint64(mapIndex), 10)) 
-	if err != nil {
-		errors.New("Get request failed")
-	}
+		res, err := http.Get("https://pokeapi.co/api/v2/location-area/" + strconv.FormatUint(uint64(mapIndex), 10)) 
+		if err != nil {
+			errors.New("Get request failed")
+		}
 
-	body, err := io.ReadAll(res.Body)
-	if err != nil {
-		errors.New("io.ReadAll() failed")
-	}
+		body, err := io.ReadAll(res.Body)
+		if err != nil {
+			errors.New("io.ReadAll() failed")
+		}
 
-	location := location{} 
-	err = json.Unmarshal(body, &location)
-	if err != nil {
-		errors.New("json.Unmarshal() failed")
-	}
-	fmt.Println(location.Name) 
+		location := location{} 
+		err = json.Unmarshal(body, &location)
+		if err != nil {
+			errors.New("json.Unmarshal() failed")
+		}
+		fmt.Println(location.Name) 
 
-	defer res.Body.Close()
-	mapIndex++
+		defer res.Body.Close()
+		mapIndex++
+	}
+	return nil
+} 
+
+func commandMapB() error { 
+	if finalIndex < 22 {
+		fmt.Println("you're on the first page")
+	}
+	finalIndex -= 20 
+	mapIndex := finalIndex - 20
+	for mapIndex <= finalIndex {
+		res, err := http.Get("https://pokeapi.co/api/v2/location-area/" + strconv.FormatUint(uint64(mapIndex), 10)) 
+		if err != nil {
+			errors.New("Get request failed")
+		}
+
+		body, err := io.ReadAll(res.Body)
+		if err != nil {
+			errors.New("io.ReadAll() failed")
+		}
+
+		location := location{} 
+		err = json.Unmarshal(body, &location)
+		if err != nil {
+			errors.New("json.Unmarshal() failed")
+		}
+		fmt.Println(location.Name) 
+
+		defer res.Body.Close()
+		mapIndex++
 	}
 	return nil
 }
@@ -101,7 +137,5 @@ type location struct {
 }
 
 var commands map[string]cliCommand
-
-var mapIndex uint16 = 1 
 
 var finalIndex uint16 = 1
