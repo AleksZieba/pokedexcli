@@ -9,10 +9,12 @@ import(
 	"errors"
 	"strconv"
 	"io"
-	"encoding/json"
+	"encoding/json" 
+	"pokedexcli/internal/pokecache"
 ) 
 
 func main() { 
+	cache := NewCache(5 * time.Second)
 	scanner := bufio.NewScanner(os.Stdin)
 	fmt.Print("Pokedex > ") 
 	commands = map[string]cliCommand{
