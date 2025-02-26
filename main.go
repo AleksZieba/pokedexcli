@@ -10,11 +10,11 @@ import(
 	"strconv"
 	"io"
 	"encoding/json" 
-	"pokedexcli/internal/pokecache"
+	"github.com/AleksZieba/pokedexcli/internal/pokecache"
+	"time"
 ) 
 
 func main() { 
-	cache := NewCache(5 * time.Second)
 	scanner := bufio.NewScanner(os.Stdin)
 	fmt.Print("Pokedex > ") 
 	commands = map[string]cliCommand{
@@ -64,36 +64,51 @@ func commandExit() error {
 } 
 
 func commandHelp() error {
-	fmt.Println("Welcome to the Pokedex!\nUsage:\n")
+	fmt.Println("Welcome to the Pokedex!\nUsage:")
 	for _, command := range commands {
-		fmt.Println(command.name + ": " + command.description)
+		fmt.Println("\n" + command.name + ": " + command.description)
 	} 
 	return nil 
 } 
 
 func commandMap() error {
 	finalIndex += 20 
-	mapIndex := finalIndex - 20
+	mapIndex := finalIndex - 20 
 	for mapIndex <= finalIndex {
-		res, err := http.Get("https://pokeapi.co/api/v2/location-area/" + strconv.FormatUint(uint64(mapIndex), 10)) 
-		if err != nil {
-			errors.New("Get request failed")
-		}
+		reqURL := "https://pokeapi.co/api/v2/location-area/" + strconv.FormatUint(uint64(mapIndex), 10)
+		if body, ok := cache.Entries[reqURL]; ok {
+			//cache.Add(reqURL, body)
+		//cache.Add("key" + strconv.FormatUint(uint64(mapIndex), 10), body)
+		//keyNum++
+			location := location{} 
+			err := json.Unmarshal(body.Val, &location)
+			if err != nil {
+				errors.New("json.Unmarshal() failed")
+			}
+			fmt.Println(location.Name) 
+		} else {
+			res, err := http.Get(reqURL)
+			if err != nil {
+				errors.New("Get request failed")
+			}
 
-		body, err := io.ReadAll(res.Body)
-		if err != nil {
-			errors.New("io.ReadAll() failed")
+			body, err := io.ReadAll(res.Body)
+			if err != nil {
+				errors.New("io.ReadAll() failed")
+			} //body = []bytes
+			cache.Add(reqURL, body)
+			//cache.Add("key" + strconv.FormatUint(uint64(mapIndex), 10), body)
+			//keyNum++
+			location := location{} 
+			err = json.Unmarshal(body, &location)
+			if err != nil {
+				errors.New("json.Unmarshal() failed")
+			}
+			fmt.Println(location.Name) 
+			defer res.Body.Close()
 		}
-
-		location := location{} 
-		err = json.Unmarshal(body, &location)
-		if err != nil {
-			errors.New("json.Unmarshal() failed")
-		}
-		fmt.Println(location.Name) 
-
-		defer res.Body.Close()
-		mapIndex++
+	
+		mapIndex++ 
 	}
 	return nil
 } 
@@ -104,25 +119,34 @@ func commandMapB() error {
 	}
 	finalIndex -= 20 
 	mapIndex := finalIndex - 20
-	for mapIndex <= finalIndex {
-		res, err := http.Get("https://pokeapi.co/api/v2/location-area/" + strconv.FormatUint(uint64(mapIndex), 10)) 
-		if err != nil {
-			errors.New("Get request failed")
-		}
-
-		body, err := io.ReadAll(res.Body)
-		if err != nil {
-			errors.New("io.ReadAll() failed")
-		}
-
-		location := location{} 
-		err = json.Unmarshal(body, &location)
-		if err != nil {
-			errors.New("json.Unmarshal() failed")
+	for mapIndex <= finalIndex {  
+		reqURL := "https://pokeapi.co/api/v2/location-area/" + strconv.FormatUint(uint64(mapIndex), 10)
+		if body, ok := cache.Entries[reqURL]; ok {
+			location := location{} 
+			err := json.Unmarshal(body.Val, &location)
+			if err != nil {
+				errors.New("json.Unmarshal() failed")
 		}
 		fmt.Println(location.Name) 
+		} else {res, err := http.Get("https://pokeapi.co/api/v2/location-area/" + strconv.FormatUint(uint64(mapIndex), 10)) 
+			if err != nil {
+				errors.New("Get request failed")
+			}
 
-		defer res.Body.Close()
+			body, err := io.ReadAll(res.Body)
+			if err != nil {
+				errors.New("io.ReadAll() failed")
+			}
+
+			location := location{} 
+			err = json.Unmarshal(body, &location)
+			if err != nil {
+				errors.New("json.Unmarshal() failed")
+			}
+			fmt.Println(location.Name) 
+			defer res.Body.Close()
+		} 
+		
 		mapIndex++
 	}
 	return nil
@@ -135,9 +159,13 @@ type cliCommand struct {
 } 
 
 type location struct {
-	Name	string	`json:"name"`
+	Name	string	`json:"name"` // should this be capitalized???
 }
 
 var commands map[string]cliCommand
 
-var finalIndex uint16 = 1
+var finalIndex uint16 = 1 
+ 
+// var keyNum uint16 = 1 // same as mapIndex really 
+
+var cache *pokecache.Cache = pokecache.NewCache(5 * time.Second)

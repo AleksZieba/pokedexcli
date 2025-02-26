@@ -2,52 +2,51 @@ package pokecache
 
 import(
 	"time" 
-	"sync"
+	"sync" 
 )
 type Cache struct {
-	entries		map[string]cacheEntry 
+	Entries		map[string]cacheEntry 
 	mu			sync.Mutex 
 	interval 	time.Duration
 } 
 
 type cacheEntry struct {
-	createdAt	Time 
-	val 		[]byte 
+	createdAt	time.Time
+	Val 		[]byte 
 } 
 
 func NewCache(interval time.Duration) *Cache {
 	c := &Cache{
-		entries: make(map[string]cacheEntry),
+		Entries: make(map[string]cacheEntry),
+		interval: interval,
 	}
 
-	//start the background reaping process
-	go c.reapLoop(interval)
-
+	go c.reapLoop()
 	
 	return c
 } 
 
-func (c *Cache) Add(key string, val []byte) 
+func (c *Cache) Add(key string, val []byte) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	e := cacheEntry{ 
 	createdAt: 	time.Now(), 
-	val: 		val,
+	Val: 		val,
 	}  
-	c.entries[key] = e 
+	c.Entries[key] = e 
+	}
 
 func (c *Cache) Get(key string) ([]byte, bool) {
 	c.mu.Lock() 
-	defer c.mu.Unlock() 
-	
+	defer c.mu.Unlock()  
 
-	if entry, ok := c.entries[key]; !ok {
+	if entry, ok := c.Entries[key]; !ok {
 		return nil, false 
 	} else if time.Now().Sub(entry.createdAt) > c.interval { 
 		return nil, false
 	} else {
-		return entry.val, true 
+		return entry.Val, true 
 	}
 }
 	
@@ -55,15 +54,11 @@ func (c *Cache) reapLoop() {
 	ticker := time.NewTicker(c.interval) 
 	defer ticker.Stop()
 	for {
-		t := <-ticker.C 
-		for _, entry := range c.entries {
+		_ = <-ticker.C //can this be blocked without the variable??? 
+		for k, entry := range c.Entries {
 			if time.Now().Sub(entry.createdAt) > c.interval {
-				delete(c.entries, entry)
+				delete(c.Entries, k)
 			}
 		}
 	}
 }
-
-
-
-
