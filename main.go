@@ -10,14 +10,24 @@ import(
 	"strconv"
 	"io"
 	"encoding/json" 
-	"github.com/AleksZieba/pokedexcli/internal/pokecache"
 	"time"
+	"github.com/AleksZieba/pokedexcli/internal/pokecache"
+	
 ) 
 
-func main() { 
-	scanner := bufio.NewScanner(os.Stdin)
-	fmt.Print("Pokedex > ") 
-	commands = map[string]cliCommand{
+var cmd *cliCommand 
+
+var commands map[string]*cliCommand 
+
+type cliCommand struct {
+	name 		string 
+	description	string   
+	callback 	func() error 
+	parameters 	string
+} 
+
+func initCommands() {
+	commands = map[string]*cliCommand{
 		"help": {
 			name:			"help",
 			description:	"Displays a help message",
@@ -37,20 +47,62 @@ func main() {
 			name: 			"mapb",
 			description:	"Displays previous 20 locations",
 			callback:		commandMapB,
+		}, 
+		"explore": {
+			name:			"explore",
+			description:	"Displays the Pokemon in a location", 
+			callback:		commandExplore,
 		},
 	}
-	for {
-		if scanner.Scan() == true { 
+}
+
+func main() { 
+	initCommands()
+	
+	repl()
+/*		if scanner.Scan() == true { 
 			input := scanner.Text() 
 			strslice := cleanInput(input) 
 			if cmd, ok := commands[strslice[0]]; ok {
+				if cmd.name == "explore" {
+					if len(strslice) < 2 {
+						fmt.Println("Location missing, please try again")
+					} else {
+					cmd.parameters = strslice[1] 
+					}
+				}
 				cmd.callback() 
+			} else {
+				fmt.Println("Unknown command")
+			}
+		} */
+	 
+}
+
+func repl() { 
+	scanner := bufio.NewScanner(os.Stdin) 
+	for { 
+		fmt.Print("Pokedex > ")
+		if scanner.Scan() == true { 
+			input := scanner.Text() 
+			strslice := cleanInput(input) 
+			if command, ok := commands[strslice[0]]; ok {
+				if command.name == "explore" {
+					if len(strslice) < 2 {
+						fmt.Println("Location missing, please try again")
+					} else {
+					command.parameters = strslice[1] 
+					cmd = command
+					}
+				}
+				command.callback() 
 			} else {
 				fmt.Println("Unknown command")
 			}
 		} 
 	}
 }
+
 
 func cleanInput(text string) []string {
 	text = strings.ToLower(text)
@@ -75,11 +127,9 @@ func commandMap() error {
 	finalIndex += 20 
 	mapIndex := finalIndex - 20 
 	for mapIndex <= finalIndex {
-		reqURL := "https://pokeapi.co/api/v2/location-area/" + strconv.FormatUint(uint64(mapIndex), 10)
+		reqURL := "https://pokeapi.co/api/v2/location-area/" + strconv.FormatUint(mapIndex, 10)
 		if body, ok := cache.Entries[reqURL]; ok {
-			//cache.Add(reqURL, body)
-		//cache.Add("key" + strconv.FormatUint(uint64(mapIndex), 10), body)
-		//keyNum++
+			
 			location := location{} 
 			err := json.Unmarshal(body.Val, &location)
 			if err != nil {
@@ -97,8 +147,7 @@ func commandMap() error {
 				errors.New("io.ReadAll() failed")
 			} //body = []bytes
 			cache.Add(reqURL, body)
-			//cache.Add("key" + strconv.FormatUint(uint64(mapIndex), 10), body)
-			//keyNum++
+			
 			location := location{} 
 			err = json.Unmarshal(body, &location)
 			if err != nil {
@@ -120,7 +169,7 @@ func commandMapB() error {
 	finalIndex -= 20 
 	mapIndex := finalIndex - 20
 	for mapIndex <= finalIndex {  
-		reqURL := "https://pokeapi.co/api/v2/location-area/" + strconv.FormatUint(uint64(mapIndex), 10)
+		reqURL := "https://pokeapi.co/api/v2/location-area/" + strconv.FormatUint(mapIndex, 10)
 		if body, ok := cache.Entries[reqURL]; ok {
 			location := location{} 
 			err := json.Unmarshal(body.Val, &location)
@@ -128,7 +177,7 @@ func commandMapB() error {
 				errors.New("json.Unmarshal() failed")
 		}
 		fmt.Println(location.Name) 
-		} else {res, err := http.Get("https://pokeapi.co/api/v2/location-area/" + strconv.FormatUint(uint64(mapIndex), 10)) 
+		} else {res, err := http.Get("https://pokeapi.co/api/v2/location-area/" + strconv.FormatUint(mapIndex, 10)) 
 			if err != nil {
 				errors.New("Get request failed")
 			}
@@ -146,26 +195,77 @@ func commandMapB() error {
 			fmt.Println(location.Name) 
 			defer res.Body.Close()
 		} 
-		
+
 		mapIndex++
 	}
 	return nil
-}
-
-type cliCommand struct {
-	name 		string 
-	description	string 
-	callback 	func() error 
 } 
 
-type location struct {
-	Name	string	`json:"name"` // should this be capitalized???
+func commandExplore() error {
+	reqURL := "https://pokeapi.co/api/v2/location-area/" + cmd.parameters
+	if body, ok := cache.Entries[reqURL]; ok {
+			
+		location := location{} 
+		err := json.Unmarshal(body.Val, &location)
+		if err != nil {
+			errors.New("json.Unmarshal() failed")
+		}
+		//fmt.Println(location.Name) 
+		fmt.Printf("Exploring %s...\nFound Pokemon:\n", location.Name) 
+		for _, pokemon := range(location.PokemonEncounters) {
+			//pokemon = strings.ReplaceAll(pokemon, "}", "")
+			fmt.Printf(" - %s\n", pokemon.Pokemon.Name)
+		}
+	} else {
+		res, err := http.Get(reqURL)
+		if err != nil {
+			errors.New("Get request failed")
+		}
+
+		body, err := io.ReadAll(res.Body)
+		if err != nil {
+			errors.New("io.ReadAll() failed")
+		} //body = []bytes
+		cache.Add(reqURL, body)
+		
+		location := location{} 
+		err = json.Unmarshal(body, &location)
+		if err != nil {
+			errors.New("json.Unmarshal() failed")
+		}
+		fmt.Printf("Exploring %s...\nFound Pokemon:\n", location.Name) 
+		for _, pokemon := range(location.PokemonEncounters) {
+			//pokemon = strings.ReplaceAll(pokemon, "}", "")
+			fmt.Printf(" - %s\n", pokemon.Pokemon.Name)
+		}
+		defer res.Body.Close()
+	}
+
+	return nil 
 }
 
-var commands map[string]cliCommand
+/* type cmdParameters struct {
+	name		string 
+	id			int 
+} */
 
-var finalIndex uint16 = 1 
- 
-// var keyNum uint16 = 1 // same as mapIndex really 
+type location struct {
+	ID      				int     `json:"id"`
+	Name					string	`json:"name"` // should this be capitalized???
+	PokemonEncounters    	[]PokemonEncounters    `json:"pokemon_encounters"`
+} 
 
-var cache *pokecache.Cache = pokecache.NewCache(5 * time.Second)
+type Pokemon struct {
+	Name string `json:"name"`
+//	URL  string `json:"url"`
+} 
+
+type PokemonEncounters struct {
+	Pokemon        Pokemon          `json:"pokemon"`
+//	VersionDetails []VersionDetails `json:"version_details"`
+}
+
+var finalIndex uint64 = 1 
+
+var cache *pokecache.Cache = pokecache.NewCache(15 * time.Second) 
+
