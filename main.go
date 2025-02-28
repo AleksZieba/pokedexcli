@@ -63,6 +63,11 @@ func initCommands() {
 			description:	"Gives details about a captured Pokemon", 
 			callback:		commandInspect, 
 		},
+		"pokedex": {
+			name:			"pokedex", 
+			description:	"Lists all captured Pokemon", 
+			callback:		commandPokedex,
+		},
 	}
 }
 
@@ -331,6 +336,14 @@ func commandInspect() error {
 		for _, poketype := range(pokemon.Types) {
 			fmt.Printf("  - %s\n", poketype.Type.Name)
 		}
+	}
+	return nil 
+} 
+
+func commandPokedex() error {
+	fmt.Println("Your Pokedex:")
+	for _, pokemon := range(pokedex) {
+		fmt.Printf(" - %s\n", pokemon.Name) 
 	}
 	return nil 
 }
