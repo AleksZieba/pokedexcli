@@ -10,9 +10,9 @@ import(
 	"strconv"
 	"io"
 	"encoding/json" 
-	"time"
+	"time" 
+	"math/rand"
 	"github.com/AleksZieba/pokedexcli/internal/pokecache"
-	
 ) 
 
 var cmd *cliCommand 
@@ -52,6 +52,11 @@ func initCommands() {
 			name:			"explore",
 			description:	"Displays the Pokemon in a location", 
 			callback:		commandExplore,
+		}, 
+		"catch": {
+			name:			"catch",
+			description:	"Attempts to catch a given Pokemon",
+			callback:		commandCatch,
 		},
 	}
 }
@@ -60,23 +65,6 @@ func main() {
 	initCommands()
 	
 	repl()
-/*		if scanner.Scan() == true { 
-			input := scanner.Text() 
-			strslice := cleanInput(input) 
-			if cmd, ok := commands[strslice[0]]; ok {
-				if cmd.name == "explore" {
-					if len(strslice) < 2 {
-						fmt.Println("Location missing, please try again")
-					} else {
-					cmd.parameters = strslice[1] 
-					}
-				}
-				cmd.callback() 
-			} else {
-				fmt.Println("Unknown command")
-			}
-		} */
-	 
 }
 
 func repl() { 
@@ -87,9 +75,10 @@ func repl() {
 			input := scanner.Text() 
 			strslice := cleanInput(input) 
 			if command, ok := commands[strslice[0]]; ok {
-				if command.name == "explore" {
+				if command.name == "explore" || command.name == "catch" {
 					if len(strslice) < 2 {
-						fmt.Println("Location missing, please try again")
+						fmt.Println("Missing location/Pokemon name, please try again") 
+						repl()
 					} else {
 					command.parameters = strslice[1] 
 					cmd = command
@@ -177,7 +166,8 @@ func commandMapB() error {
 				errors.New("json.Unmarshal() failed")
 		}
 		fmt.Println(location.Name) 
-		} else {res, err := http.Get("https://pokeapi.co/api/v2/location-area/" + strconv.FormatUint(mapIndex, 10)) 
+		} else {
+			res, err := http.Get("https://pokeapi.co/api/v2/location-area/" + strconv.FormatUint(mapIndex, 10)) 
 			if err != nil {
 				errors.New("Get request failed")
 			}
@@ -269,3 +259,44 @@ var finalIndex uint64 = 1
 
 var cache *pokecache.Cache = pokecache.NewCache(15 * time.Second) 
 
+var pokedex = make(map[string]PokemonDetails, 0) 
+
+type PokemonDetails struct {
+//	ID                     int           `json:"id"`
+	Name                   string        `json:"name"`
+	BaseExperience         int           `json:"base_experience"`
+} 
+
+//var cmd2 *cliCommand 
+
+func commandCatch() error {
+	fmt.Printf("Throwing a Pokeball at %s...", cmd.parameters)
+	reqURL := "https://pokeapi.co/api/v2/pokemon/" + cmd.parameters //+"/"
+	res, err := http.Get(reqURL) 
+		if err != nil {
+			errors.New("Get request failed")
+		}
+		defer res.Body.Close() //should work here, refactor others??
+
+		body, err := io.ReadAll(res.Body)
+		if err != nil {
+			errors.New("io.ReadAll() failed")
+		}
+
+		pokemon := PokemonDetails{} 
+		err = json.Unmarshal(body, &pokemon)
+		if err != nil {
+			errors.New("json.Unmarshal() failed")
+		}
+		chance := int(rand.Float32() * 100)
+		if chance < pokemon.BaseExperience {
+			fmt.Printf("\n%s escaped!", pokemon.Name)
+		} else {
+			if _, ok := pokedex[pokemon.Name]; !ok {
+				pokedex[pokemon.Name] = pokemon
+			}
+			fmt.Printf("\n%s was caught!", pokemon.Name) 
+		}
+		
+	return nil
+} 
