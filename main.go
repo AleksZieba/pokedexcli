@@ -57,6 +57,11 @@ func initCommands() {
 			name:			"catch",
 			description:	"Attempts to catch a given Pokemon",
 			callback:		commandCatch,
+		}, 
+		"inspect": {
+			name: 			"inspect", 
+			description:	"Gives details about a captured Pokemon", 
+			callback:		commandInspect, 
 		},
 	}
 }
@@ -75,9 +80,9 @@ func repl() {
 			input := scanner.Text() 
 			strslice := cleanInput(input) 
 			if command, ok := commands[strslice[0]]; ok {
-				if command.name == "explore" || command.name == "catch" {
+				if command.name == "explore" || command.name == "catch" || command.name == "inspect" {
 					if len(strslice) < 2 {
-						fmt.Println("Missing location/Pokemon name, please try again") 
+						fmt.Println("Missing the location or Pokemon name, please try again") 
 						repl()
 					} else {
 					command.parameters = strslice[1] 
@@ -262,10 +267,24 @@ var cache *pokecache.Cache = pokecache.NewCache(15 * time.Second)
 var pokedex = make(map[string]PokemonDetails, 0) 
 
 type PokemonDetails struct {
-//	ID                     int           `json:"id"`
 	Name                   string        `json:"name"`
 	BaseExperience         int           `json:"base_experience"`
+	Height                 int           `json:"height"`
+	Weight                 int           `json:"weight"`
+//	Stats                  []Stats       `json:"stats"`
+	Types                  []Types       `json:"types"`
 } 
+
+type Types struct {
+	Slot int  `json:"slot"`
+	Type Type `json:"type"`
+} 
+
+type Type struct {
+	Name string `json:"name"`
+	URL  string `json:"url"`
+}
+
 
 //var cmd2 *cliCommand 
 
@@ -290,13 +309,28 @@ func commandCatch() error {
 		}
 		chance := int(rand.Float32() * 100)
 		if chance < pokemon.BaseExperience {
-			fmt.Printf("\n%s escaped!", pokemon.Name)
+			fmt.Printf("\n%s escaped!\n", pokemon.Name)
 		} else {
 			if _, ok := pokedex[pokemon.Name]; !ok {
 				pokedex[pokemon.Name] = pokemon
 			}
-			fmt.Printf("\n%s was caught!", pokemon.Name) 
+			fmt.Printf("\n%s was caught!\n", pokemon.Name) 
 		}
 		
 	return nil
 } 
+
+func commandInspect() error {
+	if pokemon, ok := pokedex[cmd.parameters]; !ok {
+		fmt.Println("This Pokemon is not in the Pokedex yet.")
+	} else {
+		fmt.Printf("\nName: %s", pokemon.Name) 
+		fmt.Printf("\nHeight: %d", pokemon.Height) 
+		fmt.Printf("\nWeight: %d\n", pokemon.Weight)
+		fmt.Println("Types:")
+		for _, poketype := range(pokemon.Types) {
+			fmt.Printf("  - %s\n", poketype.Type.Name)
+		}
+	}
+	return nil 
+}
